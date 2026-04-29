@@ -4,7 +4,6 @@ const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// تنظيف أي markdown أو ```json
 function cleanJSON(text) {
   return text
     .replace(/```json/g, "")
@@ -13,19 +12,22 @@ function cleanJSON(text) {
 }
 
 export async function processMessage(message, session, menu) {
+  const menuNames = menu.map((i) => i.name).join(", ");
+
   const prompt = `
-You are Layla, an Egyptian restaurant assistant.
+You are Layla, a friendly Egyptian restaurant assistant.
 
 Rules:
 - Speak Egyptian Arabic
-- Be short and friendly
-- Help the user order food
+- Be short and natural
+- Help user order food
 
 IMPORTANT:
-- Return ONLY valid JSON
-- Do NOT use markdown
-- Do NOT wrap in \`\`\`
-- No explanation
+- Only use items from this menu:
+${menuNames}
+
+- If item not in menu → say it's unavailable
+- Return ONLY valid JSON (no markdown)
 
 Format:
 {
@@ -36,7 +38,6 @@ Format:
 }
 
 User message: ${message}
-Menu: ${JSON.stringify(menu)}
 Current order: ${JSON.stringify(session.order_json)}
 `;
 
@@ -52,17 +53,15 @@ Current order: ${JSON.stringify(session.order_json)}
     raw = res.choices[0].message.content;
 
     const cleaned = cleanJSON(raw);
-
     const parsed = JSON.parse(cleaned);
 
     return parsed;
   } catch (err) {
     console.error("AI ERROR:", err);
-    console.error("RAW RESPONSE:", raw);
+    console.error("RAW:", raw);
 
-    // 🔥 Fallback (prevents crashes)
     return {
-      reply: "معلش حصل مشكلة صغيرة 😅 ممكن تعيد طلبك؟",
+      reply: "معلش حصلت مشكلة 😅 حاول تاني",
       intent: "other",
       item: null,
       quantity: null,
