@@ -77,10 +77,10 @@ export async function activateBranch(id) {
 export async function createBranch(restaurantId, name, phone) {
   try {
     const res = await pool.query(
-      "INSERT INTO branches (restaurant_id, name, phone) VALUES ($1, $2, $3) RETURNING *",
-      [restaurantId, name, phone],
+      "INSERT INTO branches (restaurant_id, name, phone, twilio_number) VALUES ($1, $2, $3, $4) RETURNING *",
+      [restaurantId, name, phone, phone],
     );
-    console.log(`✅ Branch created: ${name}`);
+    console.log(`✅ Branch created: ${name} (twilio_number: ${phone})`);
     return res.rows[0];
   } catch (err) {
     console.error("❌ Error creating branch:", err.message);
