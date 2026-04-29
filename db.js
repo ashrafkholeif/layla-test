@@ -288,6 +288,31 @@ export async function updateSession(sessionId, orderJson) {
 
 export async function updateSessionBranch(sessionId, branchId) {
   try {
+    // Check if a session already exists for this branch+phone
+    const phoneRes = await pool.query(
+      "SELECT user_phone FROM sessions WHERE id = $1",
+      [sessionId],
+    );
+    const userPhone = phoneRes.rows[0]?.user_phone;
+
+    if (userPhone) {
+      const existing = await pool.query(
+        "SELECT * FROM sessions WHERE branch_id = $1 AND user_phone = $2",
+        [branchId, userPhone],
+      );
+
+      if (existing.rows.length > 0) {
+        // There's already a session for this branch+phone.
+        // Delete the global session and return the existing one.
+        await pool.query("DELETE FROM sessions WHERE id = $1", [sessionId]);
+        console.log(
+          `🔄 Merged global session into existing branch session ${existing.rows[0].id}`,
+        );
+        return existing.rows[0];
+      }
+    }
+
+    // Safe to update — no duplicate
     const res = await pool.query(
       "UPDATE sessions SET branch_id = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *",
       [branchId, sessionId],
