@@ -124,6 +124,41 @@ export async function getBranchByPhone(phone) {
   }
 }
 
+export async function getAllActiveBranches() {
+  try {
+    const res = await pool.query(
+      `SELECT b.*, r.name as restaurant_name
+       FROM branches b
+       JOIN restaurants r ON b.restaurant_id = r.id
+       WHERE b.is_active = true AND r.is_active = true
+       ORDER BY r.name, b.name`
+    );
+    return res.rows;
+  } catch (err) {
+    console.error("❌ Error fetching active branches:", err.message);
+    throw err;
+  }
+}
+
+export async function searchBranchesByName(searchTerm) {
+  try {
+    const res = await pool.query(
+      `SELECT b.*, r.name as restaurant_name
+       FROM branches b
+       JOIN restaurants r ON b.restaurant_id = r.id
+       WHERE b.is_active = true AND r.is_active = true
+       AND (LOWER(b.name) LIKE LOWER($1) OR LOWER(r.name) LIKE LOWER($1))
+       ORDER BY r.name, b.name
+       LIMIT 10`,
+      [`%${searchTerm}%`]
+    );
+    return res.rows;
+  } catch (err) {
+    console.error("❌ Error searching branches:", err.message);
+    throw err;
+  }
+}
+
 // ------------------
 // 📋 MENU ITEMS
 // ------------------
@@ -191,7 +226,6 @@ export async function getMenuForBranch(branchId) {
 
 export async function getOrCreateSession(branchId, userPhone) {
   try {
-    // Try to fetch existing session
     let res = await pool.query(
       "SELECT * FROM sessions WHERE branch_id = $1 AND user_phone = $2",
       [branchId, userPhone],
@@ -201,16 +235,40 @@ export async function getOrCreateSession(branchId, userPhone) {
       return res.rows[0];
     }
 
-    // Create new session
     res = await pool.query(
       "INSERT INTO sessions (branch_id, user_phone, order_json) VALUES ($1, $2, $3) RETURNING *",
       [branchId, userPhone, JSON.stringify([])],
     );
 
-    console.log(`✅ New session created for ${userPhone}`);
+    console.log(`✅ New session created for ${userPhone} (branch: ${branchId})`);
     return res.rows[0];
   } catch (err) {
     console.error("❌ Error managing session:", err.message);
+    throw err;
+  }
+}
+
+export async function getOrCreateGlobalSession(userPhone) {
+  try {
+    // Look for existing global session (branch_id IS NULL)
+    let res = await pool.query(
+      "SELECT * FROM sessions WHERE user_phone = $1 AND branch_id IS NULL",
+      [userPhone],
+    );
+
+    if (res.rows.length > 0) {
+      return res.rows[0];
+    }
+
+    res = await pool.query(
+      "INSERT INTO sessions (user_phone, order_json, context) VALUES ($1, $2, $3) RETURNING *",
+      [userPhone, JSON.stringify([]), JSON.stringify({})],
+    );
+
+    console.log(`✅ New global session created for ${userPhone}`);
+    return res.rows[0];
+  } catch (err) {
+    console.error("❌ Error managing global session:", err.message);
     throw err;
   }
 }
@@ -228,14 +286,79 @@ export async function updateSession(sessionId, orderJson) {
   }
 }
 
+export async function updateSessionBranch(sessionId, branchId) {
+  try {
+    const res = await pool.query(
+      "UPDATE sessions SET branch_id = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *",
+      [branchId, sessionId],
+    );
+    console.log(`✅ Session ${sessionId} assigned to branch ${branchId}`);
+    return res.rows[0];
+  } catch (err) {
+    console.error("❌ Error updating session branch:", err.message);
+    throw err;
+  }
+}
+
+export async function updateSessionContext(sessionId, context) {
+  try {
+    const res = await pool.query(
+      "UPDATE sessions SET context = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *",
+      [JSON.stringify(context), sessionId],
+    );
+    return res.rows[0];
+  } catch (err) {
+    console.error("❌ Error updating session context:", err.message);
+    throw err;
+  }
+}
+
 export async function clearSession(sessionId) {
   try {
     await pool.query(
-      "UPDATE sessions SET order_json = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2",
-      [JSON.stringify([]), sessionId],
+      "UPDATE sessions SET order_json = $1, pending_item = $2, context = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4",
+      [JSON.stringify([]), null, JSON.stringify({}), sessionId],
     );
   } catch (err) {
     console.error("❌ Error clearing session:", err.message);
+    throw err;
+  }
+}
+
+export async function setPendingItem(sessionId, itemName, itemPrice, qty = 1) {
+  try {
+    const res = await pool.query(
+      "UPDATE sessions SET pending_item = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *",
+      [JSON.stringify({ name: itemName, price: itemPrice, qty }), sessionId],
+    );
+    return res.rows[0];
+  } catch (err) {
+    console.error("❌ Error setting pending item:", err.message);
+    throw err;
+  }
+}
+
+export async function getPendingItem(sessionId) {
+  try {
+    const res = await pool.query(
+      "SELECT pending_item FROM sessions WHERE id = $1",
+      [sessionId],
+    );
+    return res.rows[0]?.pending_item || null;
+  } catch (err) {
+    console.error("❌ Error getting pending item:", err.message);
+    throw err;
+  }
+}
+
+export async function clearPendingItem(sessionId) {
+  try {
+    await pool.query(
+      "UPDATE sessions SET pending_item = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2",
+      [null, sessionId],
+    );
+  } catch (err) {
+    console.error("❌ Error clearing pending item:", err.message);
     throw err;
   }
 }

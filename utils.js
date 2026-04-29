@@ -110,6 +110,62 @@ export function findMenuItemFuzzy(menu, input, threshold = 0.6) {
   return null;
 }
 
+/**
+ * Find ambiguous matches — returns ALL items above threshold.
+ * Used when the user says something generic like "burger"
+ * and we want them to pick the exact type.
+ */
+export function findAmbiguousMatches(menu, input, threshold = 0.4) {
+  const normalizedInput = normalizeArabic(input);
+
+  const scored = menu.map((item) => {
+    const normalizedName = normalizeArabic(item.name);
+    const score = similarity(normalizedInput, normalizedName);
+    return { item, score };
+  });
+
+  // Filter to only those above threshold
+  const matches = scored
+    .filter((s) => s.score >= threshold)
+    .sort((a, b) => b.score - a.score);
+
+  return matches.map((m) => m.item);
+}
+
+/**
+ * Check if an input is ambiguous (multiple close matches).
+ * Returns the array of ambiguous items, or null if clear single match.
+ */
+export function resolveAmbiguousItem(menu, input, ambiguousThreshold = 0.45) {
+  const matches = findAmbiguousMatches(menu, input, ambiguousThreshold);
+
+  // If 0 matches, nothing found
+  if (matches.length === 0) return { type: "none", items: [] };
+
+  // If 1 clear match, return it directly
+  if (matches.length === 1) return { type: "single", item: matches[0] };
+
+  // If multiple matches, check if the top one is WAY better than the rest
+  const allScored = menu
+    .map((item) => {
+      const normalizedName = normalizeArabic(item.name);
+      const score = similarity(normalizeArabic(input), normalizedName);
+      return { item, score };
+    })
+    .sort((a, b) => b.score - a.score);
+
+  const topScore = allScored[0].score;
+  const secondScore = allScored[1]?.score || 0;
+
+  // If top score is clearly dominant (0.2+ gap), treat as single match
+  if (topScore - secondScore > 0.2 && topScore >= 0.6) {
+    return { type: "single", item: allScored[0].item };
+  }
+
+  // Otherwise, it's ambiguous
+  return { type: "ambiguous", items: matches };
+}
+
 // Legacy function for backward compatibility
 export function findMenuItem(menu, input) {
   return findMenuItemFuzzy(menu, input);

@@ -31,13 +31,20 @@ CREATE TABLE IF NOT EXISTS menu_items (
 
 CREATE TABLE IF NOT EXISTS sessions (
   id SERIAL PRIMARY KEY,
-  branch_id INTEGER NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
+  branch_id INTEGER REFERENCES branches(id) ON DELETE CASCADE,
   user_phone VARCHAR(20) NOT NULL,
   order_json JSONB DEFAULT '[]',
+  pending_item JSONB,
+  context JSONB DEFAULT '{}',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   UNIQUE(branch_id, user_phone)
 );
+
+-- Allow only ONE global session per user (for single Twilio number flow)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_sessions_global_user
+  ON sessions(user_phone)
+  WHERE branch_id IS NULL;
 
 CREATE TABLE IF NOT EXISTS orders (
   id SERIAL PRIMARY KEY,
@@ -51,6 +58,8 @@ CREATE TABLE IF NOT EXISTS orders (
 
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_sessions_branch_phone ON sessions(branch_id, user_phone);
+CREATE INDEX IF NOT EXISTS idx_sessions_user_phone ON sessions(user_phone);
 CREATE INDEX IF NOT EXISTS idx_menu_branch ON menu_items(branch_id);
 CREATE INDEX IF NOT EXISTS idx_orders_branch ON orders(branch_id);
 CREATE INDEX IF NOT EXISTS idx_branches_restaurant ON branches(restaurant_id);
+CREATE INDEX IF NOT EXISTS idx_branches_twilio ON branches(twilio_number);

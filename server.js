@@ -122,13 +122,16 @@ app.use((req, res) => {
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
+  const mode = process.env.LAYLA_INBOUND_NUMBER ? "🌍 GLOBAL NUMBER" : "📞 BRANCH-SPECIFIC";
   console.log(`
 ╔════════════════════════════════════════╗
 ║  🍽️  Layla Backend v2.0 🍽️             ║
 ║  Running on http://localhost:${PORT}    ║
+║  Mode: ${mode.padEnd(28)}║
 ║  Database: ${process.env.DATABASE_URL ? "✅ Connected" : "❌ Not set"}        ║
 ║  OpenAI: ${process.env.OPENAI_API_KEY ? "✅ Configured" : "❌ Not set"}         ║
-║  Twilio: ${process.env.TWILIO_ACCOUNT_SID ? "✅ Configured" : "❌ Not set"}        ║
+║  Twilio Inbound: ${process.env.LAYLA_INBOUND_NUMBER ? "✅ " + process.env.LAYLA_INBOUND_NUMBER : "❌ Not set"}  ║
+║  Twilio Outbound: ${process.env.TWILIO_WHATSAPP_FROM ? "✅ " + process.env.TWILIO_WHATSAPP_FROM : "❌ Not set"}  ║
 ╚════════════════════════════════════════╝
   `);
 });
