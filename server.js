@@ -1,150 +1,126 @@
 import express from "express";
 import bodyParser from "body-parser";
-import pkg from "pg";
-import { processMessage } from "./ai.js";
+import path from "path";
+import { fileURLToPath } from "url";
 
-const { Pool } = pkg;
+// Routes
+import { handleTwilioWebhook } from "./routes/twilio.js";
+import { handleSignup } from "./routes/signup.js";
+import {
+  handleCreateBranch,
+  handleGetBranches,
+  handleGetBranchById,
+} from "./routes/branches.js";
+import {
+  handleUploadMenu,
+  handleGetMenu,
+  handleAddMenuItem,
+} from "./routes/menu.js";
+import {
+  handleActivateRestaurant,
+  handleGetRestaurant,
+} from "./routes/activate.js";
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const app = express();
+
+// Middleware
+app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.json());
+
+// Static files
+app.use(express.static(path.join(__dirname, "public")));
+
+// Logging middleware
+app.use((req, res, next) => {
+  console.log(`\n${new Date().toISOString()} | ${req.method} ${req.path}`);
+  next();
 });
 
-const app = express();
-app.use(bodyParser.urlencoded({ extended: false }));
+// ------------------
+// 📝 AUTHENTICATION MIDDLEWARE (simple)
+// For now, no auth needed - but add this later if required
+// ------------------
 
 // ------------------
-// 🔤 Arabic Normalization
+// 🎯 API ROUTES
 // ------------------
-function normalizeArabic(text) {
-  return text
-    .replace(/أ|إ|آ/g, "ا")
-    .replace(/ة/g, "ه")
-    .replace(/ى/g, "ي")
-    .replace(/ؤ/g, "و")
-    .replace(/ئ/g, "ي")
-    .toLowerCase()
-    .trim();
-}
+
+// Signup (no auth needed)
+app.post("/api/signup", handleSignup);
+
+// Branches
+app.post("/api/branches", handleCreateBranch);
+app.get("/api/branches/:restaurantId", handleGetBranches);
+app.get("/api/branch/:branchId", handleGetBranchById);
+
+// Menu
+app.post("/api/menu", handleUploadMenu);
+app.get("/api/menu/:branchId", handleGetMenu);
+app.post("/api/menu/item", handleAddMenuItem);
+
+// Activation
+app.post("/api/activate", handleActivateRestaurant);
+app.get("/api/restaurant/:restaurantId", handleGetRestaurant);
 
 // ------------------
-// 🔍 Smart Matching
+// 🤖 TWILIO WEBHOOK (CRITICAL)
 // ------------------
-function findMenuItem(menu, input) {
-  const normalizedInput = normalizeArabic(input);
+app.post("/twilio", handleTwilioWebhook);
 
-  return menu.find((item) => {
-    const normalizedName = normalizeArabic(item.name);
-    return (
-      normalizedName.includes(normalizedInput) ||
-      normalizedInput.includes(normalizedName)
-    );
+// ------------------
+// 🌍 WEB PORTAL
+// ------------------
+
+// Serve portal pages
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public/index.html"));
+});
+
+app.get("/branch-setup", (req, res) => {
+  res.sendFile(path.join(__dirname, "public/branch-setup.html"));
+});
+
+app.get("/menu-upload", (req, res) => {
+  res.sendFile(path.join(__dirname, "public/menu-upload.html"));
+});
+
+app.get("/activation", (req, res) => {
+  res.sendFile(path.join(__dirname, "public/activation.html"));
+});
+
+// ------------------
+// ❌ ERROR HANDLING
+// ------------------
+
+app.use((err, req, res, next) => {
+  console.error("❌ Unhandled error:", err);
+  res.status(500).json({
+    error: "Internal server error",
+    message: process.env.NODE_ENV === "development" ? err.message : undefined,
   });
-}
+});
+
+app.use((req, res) => {
+  res.status(404).json({
+    error: "Not found",
+  });
+});
 
 // ------------------
-// 🧠 Session
+// 🚀 START SERVER
 // ------------------
-async function getSession(phone) {
-  const res = await pool.query("SELECT * FROM sessions WHERE phone=$1", [
-    phone,
-  ]);
 
-  if (res.rows.length > 0) return res.rows[0];
+const PORT = process.env.PORT || 3000;
 
-  const newSession = await pool.query(
-    "INSERT INTO sessions (phone, order_json) VALUES ($1,$2) RETURNING *",
-    [phone, JSON.stringify([])],
-  );
-
-  return newSession.rows[0];
-}
-
-// ------------------
-// 📲 MAIN ROUTE
-// ------------------
-app.post("/twilio", async (req, res) => {
-  const message = req.body.Body;
-  const phone = req.body.From;
-
-  const session = await getSession(phone);
-
-  const menuRes = await pool.query(
-    "SELECT * FROM menu_items WHERE restaurant_id = 1",
-  );
-
-  const menu = menuRes.rows;
-
-  const ai = await processMessage(message, session, menu);
-
-  console.log("USER:", message);
-  console.log("AI:", ai);
-
-  let order = session.order_json || [];
-
-  // ------------------
-  // 🛒 ADD ITEM
-  // ------------------
-  if (ai.intent === "place_order" && ai.item) {
-    const item = findMenuItem(menu, ai.item);
-
-    if (!item) {
-      return res.send(`
-        <Response>
-          <Message>الحاجة دي مش موجودة في المنيو 😅</Message>
-        </Response>
-      `);
-    }
-
-    order.push({
-      item: item.name,
-      qty: ai.quantity || 1,
-    });
-
-    await pool.query("UPDATE sessions SET order_json=$1 WHERE id=$2", [
-      JSON.stringify(order),
-      session.id,
-    ]);
-  }
-
-  // ------------------
-  // ✅ CONFIRM ORDER
-  // ------------------
-  if (ai.intent === "confirm_order") {
-    let total = 0;
-
-    for (let o of order) {
-      const item = findMenuItem(menu, o.item);
-      if (item) {
-        total += item.price * o.qty;
-      }
-    }
-
-    await pool.query(
-      "INSERT INTO orders (restaurant_id, phone, total) VALUES (1,$1,$2)",
-      [phone, total],
-    );
-
-    await pool.query("UPDATE sessions SET order_json=$1 WHERE id=$2", [
-      JSON.stringify([]),
-      session.id,
-    ]);
-
-    return res.send(`
-      <Response>
-        <Message>تم تأكيد الأوردر ✅ الإجمالي ${total} جنيه</Message>
-      </Response>
-    `);
-  }
-
-  // ------------------
-  // 💬 DEFAULT REPLY
-  // ------------------
-  res.send(`
-    <Response>
-      <Message>${ai.reply}</Message>
-    </Response>
+app.listen(PORT, () => {
+  console.log(`
+╔════════════════════════════════════════╗
+║  🍽️  Layla Backend v2.0 🍽️             ║
+║  Running on http://localhost:${PORT}    ║
+║  Database: ${process.env.DATABASE_URL ? "✅ Connected" : "❌ Not set"}        ║
+║  OpenAI: ${process.env.OPENAI_API_KEY ? "✅ Configured" : "❌ Not set"}         ║
+║  Twilio: ${process.env.TWILIO_ACCOUNT_SID ? "✅ Configured" : "❌ Not set"}        ║
+╚════════════════════════════════════════╝
   `);
 });
-
-app.listen(3000, () => console.log("Running..."));

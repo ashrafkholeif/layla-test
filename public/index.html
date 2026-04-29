@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Layla - Start Your Restaurant</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <div class="card">
+        <div class="logo">🍽️</div>
+        <h1>مرحبًا بك في Layla</h1>
+        <p class="subtitle">نظام طلبات WhatsApp الذكي للمطاعم</p>
+
+        <form id="signupForm" class="form">
+          <div class="form-group">
+            <label for="restaurantName">اسم المطعم</label>
+            <input
+              type="text"
+              id="restaurantName"
+              placeholder="مثال: الشرقاوي"
+              required
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="ownerPhone">رقم الهاتف</label>
+            <input
+              type="tel"
+              id="ownerPhone"
+              placeholder="مثال: +201001234567"
+              required
+            />
+          </div>
+
+          <button type="submit" class="btn btn-primary">ابدأ الآن</button>
+        </form>
+
+        <p class="small-text">سيتم إنشاء حسابك في ثواني معدودة ✨</p>
+      </div>
+    </div>
+
+    <script>
+      document
+        .getElementById("signupForm")
+        .addEventListener("submit", async (e) => {
+          e.preventDefault();
+
+          const name = document.getElementById("restaurantName").value;
+          const phone = document.getElementById("ownerPhone").value;
+
+          try {
+            const response = await fetch("/api/signup", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ name, phone }),
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+              // Save to localStorage and redirect
+              localStorage.setItem("restaurantId", data.restaurantId);
+              alert("مبروك! 🎉\nسيتم نقلك إلى إعداد الفروع");
+              window.location.href = `/branch-setup?restaurantId=${data.restaurantId}`;
+            } else {
+              alert("خطأ: " + data.error);
+            }
+          } catch (err) {
+            alert("حدث خطأ: " + err.message);
+          }
+        });
+    </script>
+  </body>
+</html>

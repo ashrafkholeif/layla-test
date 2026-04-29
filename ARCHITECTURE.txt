@@ -1,0 +1,233 @@
+╔══════════════════════════════════════════════════════════════════════════╗
+║                  LAYLA V2 - SYSTEM ARCHITECTURE                         ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         🌐 FRONTEND (Public)                            │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+│  │   /          │  │ /branch-     │  │  /menu-      │  │ /activation  │
+│  │  Signup      │→→│ setup        │→→│  upload      │→→│              │
+│  │  Page        │  │  Page        │  │  Page        │  │  Page        │
+│  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘
+│         ↓                ↓                  ↓                 ↓
+│      POST /api/signup  /branches      POST /menu         /activate
+│
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    🔧 BACKEND (Node.js + Express)                       │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │                      server.js (Main)                           │   │
+│  │  - Express app setup                                            │   │
+│  │  - Routing configuration                                        │   │
+│  │  - Static file serving (/public)                               │   │
+│  │  - Error handling middleware                                   │   │
+│  └─────────────────────────────────────────────────────────────────┘   │
+│                                    │                                    │
+│              ┌─────────────────────┼─────────────────────┐              │
+│              ↓                     ↓                     ↓              │
+│   ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐    │
+│   │  API Routes (5)  │  │ Twilio Webhook   │  │   Utilities      │    │
+│   ├──────────────────┤  ├──────────────────┤  ├──────────────────┤    │
+│   │ • signup.js      │  │ • twilio.js      │  │ • db.js          │    │
+│   │ • branches.js    │  │   (⭐ FIXED)     │  │ • ai.js          │    │
+│   │ • menu.js        │  │                  │  │ • utils.js       │    │
+│   │ • activate.js    │  │ Incoming: WhatsApp  │                  │    │
+│   │                  │  │ Outgoing: TwiML  │  │ 250+ lines each  │    │
+│   │ Input validation │  │                  │  │                  │    │
+│   │ Error handling   │  │ Response fix:    │  │ • Arabic NLP     │    │
+│   │ Proper logging   │  │ ✅ res.type()    │  │ • Fuzzy matching │    │
+│   │                  │  │ ✅ XML format    │  │ • Validation     │    │
+│   │                  │  │ ✅ Return stmt   │  │ • Parsing        │    │
+│   └──────────────────┘  └──────────────────┘  └──────────────────┘    │
+│           ↓                      ↓                       ↓              │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│              💾 DATABASE (PostgreSQL) - Multi-Tenant Schema             │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  ┌────────────────┐       ┌──────────────┐       ┌──────────────────┐ │
+│  │ restaurants    │──────→│ branches     │──────→│ menu_items       │ │
+│  ├────────────────┤  1:N  ├──────────────┤  1:N  ├──────────────────┤ │
+│  │ id (PK)        │       │ id (PK)      │       │ id (PK)          │ │
+│  │ name           │       │ rest_id (FK) │       │ branch_id (FK)   │ │
+│  │ owner_phone    │       │ name         │       │ name             │ │
+│  │ is_active      │       │ phone        │       │ price            │ │
+│  │ created_at     │       │ is_active    │       │ created_at       │ │
+│  └────────────────┘       │ created_at   │       └──────────────────┘ │
+│         ↓                  └──────────────┘                            │
+│         │                        ↓                                     │
+│         └─→ ┌────────────────┐  ┌────────────────┐                   │
+│             │ sessions       │  │ orders         │                   │
+│             ├────────────────┤  ├────────────────┤                   │
+│             │ id (PK)        │  │ id (PK)        │                   │
+│             │ branch_id (FK) │  │ branch_id (FK) │                   │
+│             │ user_phone     │  │ user_phone     │                   │
+│             │ order_json     │  │ items_json     │                   │
+│             │ created_at     │  │ total          │                   │
+│             │ updated_at     │  │ created_at     │                   │
+│             └────────────────┘  └────────────────┘                   │
+│                                                                         │
+│  Indexes:                                                              │
+│  • sessions: (branch_id, user_phone)                                 │
+│  • menu_items: (branch_id)                                           │
+│  • orders: (branch_id)                                               │
+│  • branches: (restaurant_id)                                         │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                   📱 WHATSAPP MESSAGE FLOW                              │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  Customer Sends:                                                        │
+│  "عايز برجر"                                                            │
+│         ↓                                                               │
+│  Twilio Cloud                                                           │
+│         ↓                                                               │
+│  POST /twilio Webhook                                                   │
+│         │                                                               │
+│         ├→ 1. Identify branch (by To phone)                            │
+│         ├→ 2. Get/create session (customer + branch)                   │
+│         ├→ 3. Fetch menu (for this branch)                             │
+│         │                                                               │
+│         ├→ 4. Process with AI:                                         │
+│         │    • Send to OpenAI                                          │
+│         │    • Parse JSON response                                     │
+│         │    • Extract intent (place_order, confirm_order, etc.)      │
+│         │    • Extract item name                                       │
+│         │                                                               │
+│         ├→ 5. Fuzzy match item:                                        │
+│         │    • Arabic normalization                                    │
+│         │    • Levenshtein distance                                    │
+│         │    • Synonym lookup                                          │
+│         │                                                               │
+│         ├→ 6. Update state:                                            │
+│         │    • Add to order (session)                                  │
+│         │    • Or confirm order (create order record)                  │
+│         │                                                               │
+│         ├→ 7. Generate TwiML response: ⭐ FIXED                        │
+│         │    • Set res.type("text/xml")                                │
+│         │    • XML declaration                                         │
+│         │    • Escape special chars                                    │
+│         │    • Valid <Response><Message></Message>                     │
+│         │                                                               │
+│         └→ 8. Return 200 OK                                            │
+│                                                                         │
+│  Twilio receives valid TwiML → Parses → Sends to WhatsApp             │
+│                                            ↓                           │
+│  Customer receives: "تمام، واحد برجر. حاجة تانية؟"                      │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│               🎯 RESTAURANT SETUP FLOW (Portal)                         │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  1. SIGNUP                          2. BRANCHES                         │
+│     ┌──────────────┐                   ┌──────────────┐                │
+│     │ Restaurant   │                   │ Add Branch   │                │
+│     │ name         │                   │ (location 1) │                │
+│     │ phone        │                   │ +20100...    │                │
+│     └──────────────┘                   └──────────────┘                │
+│            ↓                                  ↓                         │
+│     POST /api/signup                 POST /api/branches                │
+│     restaurantId = 1                 branchId = 1                      │
+│                                                                         │
+│  3. MENU                            4. ACTIVATION                      │
+│     ┌──────────────┐                   ┌──────────────┐                │
+│     │ Add Items:   │                   │ Summary:     │                │
+│     │ برجر - 50    │                   │ • 1 branch   │                │
+│     │ فرايز - 20   │                   │ • 10 items   │                │
+│     │ عصير - 15    │                   │              │                │
+│     └──────────────┘                   │ GO LIVE! 🎉  │                │
+│            ↓                           └──────────────┘                │
+│     POST /api/menu                           ↓                         │
+│     (10 items uploaded)                POST /api/activate              │
+│                                              ↓                         │
+│                                   is_active = true                     │
+│                                   Ready for orders!                    │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    🔧 TECHNOLOGY STACK                                  │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  Runtime:      Node.js 18+ (ES modules)                               │
+│  Framework:    Express.js 5.x                                         │
+│  Database:     PostgreSQL 12+                                         │
+│  DB Driver:    pg (Node postgres)                                     │
+│  AI Engine:    OpenAI (gpt-4o-mini)                                   │
+│  Messaging:    Twilio WhatsApp API                                    │
+│  Frontend:     HTML5 / CSS3 / Vanilla JavaScript                      │
+│  Hosting:      Render (recommended)                                   │
+│                                                                         │
+│  Libraries:                                                             │
+│  • express (routing)                                                   │
+│  • body-parser (request parsing)                                      │
+│  • pg (database)                                                       │
+│  • openai (AI)                                                         │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    📊 DATA FLOW SUMMARY                                 │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  Restaurant Setup:                                                      │
+│    Signup → Branches → Menu → Activate → Live                        │
+│                                                                         │
+│  Customer Ordering:                                                     │
+│    WhatsApp → Twilio → /twilio → Process → TwiML → WhatsApp          │
+│                                                                         │
+│  Data Storage:                                                          │
+│    Sessions → Orders → PostgreSQL                                     │
+│                                                                         │
+│  AI Processing:                                                         │
+│    Customer Message → Normalize → OpenAI → Parse → Response           │
+│                                                                         │
+│  Menu Matching:                                                         │
+│    User Input → Fuzzy Match → Synonyms → Menu Item                    │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                 ✅ QUALITY ASSURANCE LAYERS                             │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  Input Layer:        Validation + Sanitization + Type Checking        │
+│  Logic Layer:        Error Handling + Safe Processing                  │
+│  Data Layer:         Parameterized Queries + Transactions             │
+│  Response Layer:     Error Responses + Proper Formatting               │
+│  Security Layer:     Environment Isolation + No Secrets                │
+│  Monitoring Layer:   Comprehensive Logging + Timestamps               │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+
+KEY FEATURES:
+✅ Multi-tenant architecture (Restaurants + Branches)
+✅ Self-serve onboarding (4-step portal)
+✅ WhatsApp integration (Twilio)
+✅ AI-powered conversations (OpenAI)
+✅ Arabic language support
+✅ Fuzzy menu matching
+✅ Session management
+✅ Order tracking
+✅ Proper error handling
+✅ Input validation
+✅ Production-ready code
+
+CRITICAL FIX: Twilio Response ✅
+✅ res.type("text/xml") - Proper headers
+✅ XML declaration - Valid format
+✅ Character escaping - Special chars handled
+✅ Return statement - Immediate response
+✅ Async handling - Proper await
+
+Ready for production deployment! 🚀

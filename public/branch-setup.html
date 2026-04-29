@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Layla - Branch Setup</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <div class="card">
+        <div class="progress-bar">
+          <div class="progress" style="width: 33%"></div>
+        </div>
+
+        <h1>إعداد الفروع</h1>
+        <p class="subtitle">أضف فرع واحد على الأقل</p>
+
+        <form id="branchForm" class="form">
+          <div class="form-group">
+            <label for="branchName">اسم الفرع</label>
+            <input
+              type="text"
+              id="branchName"
+              placeholder="مثال: الفرع الرئيسي"
+              required
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="branchPhone">رقم هاتف الفرع</label>
+            <input
+              type="tel"
+              id="branchPhone"
+              placeholder="مثال: +201001234567"
+              required
+            />
+            <small>هذا هو الرقم الذي سيرسل إليه العملاء</small>
+          </div>
+
+          <button type="submit" class="btn btn-primary">إضافة فرع</button>
+        </form>
+
+        <div id="brancheslist"></div>
+
+        <div class="actions">
+          <button id="nextBtn" class="btn btn-primary" disabled>
+            متابعة إلى المنيو
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const restaurantId = new URLSearchParams(window.location.search).get(
+        "restaurantId",
+      );
+
+      if (!restaurantId) {
+        alert("خطأ: معرّف المطعم غير موجود");
+        window.location.href = "/";
+      }
+
+      async function loadBranches() {
+        try {
+          const response = await fetch(`/api/branches/${restaurantId}`);
+          const data = await response.json();
+
+          const list = document.getElementById("brancheslist");
+          if (data.branches.length === 0) {
+            list.innerHTML = '<p class="info-text">لم تضف أي فروع بعد</p>';
+          } else {
+            list.innerHTML =
+              "<h3>الفروع المضافة:</h3>" +
+              data.branches
+                .map(
+                  (b) => `
+            <div class="branch-item">
+              <strong>${b.name}</strong><br/>
+              <small>${b.phone}</small>
+            </div>
+          `,
+                )
+                .join("");
+          }
+
+          document.getElementById("nextBtn").disabled =
+            data.branches.length === 0;
+        } catch (err) {
+          console.error(err);
+        }
+      }
+
+      document
+        .getElementById("branchForm")
+        .addEventListener("submit", async (e) => {
+          e.preventDefault();
+
+          const name = document.getElementById("branchName").value;
+          const phone = document.getElementById("branchPhone").value;
+
+          try {
+            const response = await fetch("/api/branches", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                restaurantId: parseInt(restaurantId),
+                name,
+                phone,
+              }),
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+              alert("تم إضافة الفرع بنجاح ✅");
+              document.getElementById("branchForm").reset();
+              loadBranches();
+            } else {
+              alert("خطأ: " + data.error);
+            }
+          } catch (err) {
+            alert("حدث خطأ: " + err.message);
+          }
+        });
+
+      document.getElementById("nextBtn").addEventListener("click", () => {
+        window.location.href = `/menu-upload?restaurantId=${restaurantId}`;
+      });
+
+      loadBranches();
+    </script>
+  </body>
+</html>

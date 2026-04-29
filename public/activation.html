@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Layla - Activation</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <div class="card">
+        <div class="progress-bar">
+          <div class="progress" style="width: 100%"></div>
+        </div>
+
+        <div class="logo celebration">🎉</div>
+        <h1>أنت جاهز!</h1>
+        <p class="subtitle">مطعمك على وشك الانطلاق</p>
+
+        <div class="info-box">
+          <h3>ملخص الإعداد:</h3>
+          <div id="summary"></div>
+        </div>
+
+        <div class="info-box how-it-works">
+          <h3>كيفية الاستخدام:</h3>
+          <ol>
+            <li>العملاء يرسلون رسالة WhatsApp إلى رقم فرعك</li>
+            <li>Layla تساعدهم في الاختيار من المنيو</li>
+            <li>الطلب يصل إليك تلقائيًا</li>
+          </ol>
+        </div>
+
+        <button id="activateBtn" class="btn btn-primary btn-large">
+          تفعيل الآن ✨
+        </button>
+
+        <p class="small-text">بعد التفعيل، يمكن للعملاء البدء بالطلب فورًا</p>
+      </div>
+    </div>
+
+    <script>
+      const restaurantId = new URLSearchParams(window.location.search).get(
+        "restaurantId",
+      );
+
+      if (!restaurantId) {
+        alert("خطأ: معرّف المطعم غير موجود");
+        window.location.href = "/";
+      }
+
+      async function loadSummary() {
+        try {
+          const response = await fetch(`/api/restaurant/${restaurantId}`);
+          const data = await response.json();
+
+          const summary = document.getElementById("summary");
+          summary.innerHTML = `
+          <p><strong>المطعم:</strong> ${data.restaurant.name}</p>
+          <p><strong>الفروع:</strong> ${data.branches.length}</p>
+          <p><strong>العناصر الإجمالية:</strong> ${data.branches.reduce((sum, b) => sum + b.menuCount, 0)}</p>
+        `;
+        } catch (err) {
+          console.error(err);
+        }
+      }
+
+      document
+        .getElementById("activateBtn")
+        .addEventListener("click", async () => {
+          try {
+            const response = await fetch("/api/activate", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ restaurantId: parseInt(restaurantId) }),
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+              alert("🎉 تم التفعيل بنجاح! مطعمك الآن مباشر");
+              window.location.href = "/";
+            } else {
+              alert("خطأ: " + data.error);
+            }
+          } catch (err) {
+            alert("حدث خطأ: " + err.message);
+          }
+        });
+
+      loadSummary();
+    </script>
+  </body>
+</html>

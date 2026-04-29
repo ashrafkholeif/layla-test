@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Layla - Menu Upload</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <div class="card">
+        <div class="progress-bar">
+          <div class="progress" style="width: 66%"></div>
+        </div>
+
+        <h1>رفع المنيو</h1>
+        <p class="subtitle">أضف عناصر المنيو لفروعك</p>
+
+        <div class="form-group">
+          <label for="branchSelect">اختر فرع</label>
+          <select id="branchSelect" required>
+            <option value="">-- اختر فرع --</option>
+          </select>
+        </div>
+
+        <div id="menuForm" style="display: none">
+          <div class="form-group">
+            <label>عناصر المنيو</label>
+            <div id="menuItems">
+              <div class="menu-item-row">
+                <input type="text" placeholder="اسم العنصر" class="item-name" />
+                <input
+                  type="number"
+                  placeholder="السعر"
+                  class="item-price"
+                  step="0.01"
+                />
+                <button
+                  type="button"
+                  class="btn btn-small btn-danger"
+                  onclick="removeItem(this)"
+                >
+                  حذف
+                </button>
+              </div>
+            </div>
+            <button type="button" class="btn btn-small" onclick="addItemRow()">
+              + إضافة عنصر
+            </button>
+          </div>
+
+          <button id="uploadBtn" class="btn btn-primary">رفع المنيو</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const restaurantId = new URLSearchParams(window.location.search).get(
+        "restaurantId",
+      );
+
+      if (!restaurantId) {
+        alert("خطأ: معرّف المطعم غير موجود");
+        window.location.href = "/";
+      }
+
+      async function loadBranches() {
+        try {
+          const response = await fetch(`/api/branches/${restaurantId}`);
+          const data = await response.json();
+
+          const select = document.getElementById("branchSelect");
+          select.innerHTML =
+            '<option value="">-- اختر فرع --</option>' +
+            data.branches
+              .map((b) => `<option value="${b.id}">${b.name}</option>`)
+              .join("");
+        } catch (err) {
+          console.error(err);
+        }
+      }
+
+      document
+        .getElementById("branchSelect")
+        .addEventListener("change", (e) => {
+          if (e.target.value) {
+            document.getElementById("menuForm").style.display = "block";
+          }
+        });
+
+      window.addItemRow = function () {
+        const container = document.getElementById("menuItems");
+        const row = document.createElement("div");
+        row.className = "menu-item-row";
+        row.innerHTML = `
+        <input type="text" placeholder="اسم العنصر" class="item-name" />
+        <input type="number" placeholder="السعر" class="item-price" step="0.01" />
+        <button type="button" class="btn btn-small btn-danger" onclick="removeItem(this)">حذف</button>
+      `;
+        container.appendChild(row);
+      };
+
+      window.removeItem = function (btn) {
+        btn.parentElement.remove();
+      };
+
+      document
+        .getElementById("uploadBtn")
+        .addEventListener("click", async () => {
+          const branchId = document.getElementById("branchSelect").value;
+          const items = Array.from(document.querySelectorAll(".menu-item-row"))
+            .map((row) => ({
+              name: row.querySelector(".item-name").value,
+              price: parseFloat(row.querySelector(".item-price").value),
+            }))
+            .filter((item) => item.name && item.price > 0);
+
+          if (items.length === 0) {
+            alert("أضف على الأقل عنصر واحد");
+            return;
+          }
+
+          try {
+            const response = await fetch("/api/menu", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ branchId: parseInt(branchId), items }),
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+              alert(`تم رفع ${data.count} عنصر بنجاح ✅`);
+              window.location.href = `/activation?restaurantId=${restaurantId}`;
+            } else {
+              alert("خطأ: " + data.error);
+            }
+          } catch (err) {
+            alert("حدث خطأ: " + err.message);
+          }
+        });
+
+      loadBranches();
+    </script>
+  </body>
+</html>

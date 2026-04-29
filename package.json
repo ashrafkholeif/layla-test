@@ -1,21 +1,33 @@
 {
   "name": "layla-v2",
-  "version": "1.0.0",
-  "main": "ai.js",
+  "version": "2.0.0",
+  "type": "module",
+  "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node server.js"
+    "start": "node server.js",
+    "dev": "node server.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
+  "keywords": [
+    "whatsapp",
+    "ai",
+    "restaurant",
+    "ordering",
+    "twilio",
+    "openai",
+    "nodejs"
+  ],
+  "author": "Ashraf Kholeif",
+  "license": "MIT",
+  "description": "AI-powered WhatsApp ordering system for restaurants",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
   "dependencies": {
     "body-parser": "^2.2.2",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "openai": "^6.35.0",
-    "pg": "^8.20.0",
-    "twilio": "^6.0.0"
+    "pg": "^8.20.0"
   }
 }
