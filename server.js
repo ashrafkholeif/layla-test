@@ -15,11 +15,13 @@ import {
   handleUploadMenu,
   handleGetMenu,
   handleAddMenuItem,
+  handleUploadMenuFile,
 } from "./routes/menu.js";
 import {
   handleActivateRestaurant,
   handleGetRestaurant,
 } from "./routes/activate.js";
+import { handleGetMenuTemplate } from "./routes/template.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -56,8 +58,10 @@ app.get("/api/branch/:branchId", handleGetBranchById);
 
 // Menu
 app.post("/api/menu", handleUploadMenu);
+app.post("/api/menu/upload-file", handleUploadMenuFile);
 app.get("/api/menu/:branchId", handleGetMenu);
 app.post("/api/menu/item", handleAddMenuItem);
+app.get("/api/menu-template", handleGetMenuTemplate);
 
 // Activation
 app.post("/api/activate", handleActivateRestaurant);

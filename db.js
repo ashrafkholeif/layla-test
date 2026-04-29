@@ -135,7 +135,7 @@ export async function createMenuItem(
 export async function bulkCreateMenuItems(branchId, items) {
   try {
     const values = items
-      .map((_, i) => `($1, $${i * 4 + 2}, $${i * 4 + 3}, $${i * 4 + 4})`)
+      .map((_, i) => `($1, $${i * 3 + 2}, $${i * 3 + 3}, $${i * 3 + 4})`)
       .join(",");
 
     const params = [branchId];

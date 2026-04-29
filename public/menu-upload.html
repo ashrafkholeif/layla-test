@@ -24,6 +24,36 @@
         </div>
 
         <div id="menuForm" style="display: none">
+          <!-- File Upload Section -->
+          <div class="form-group">
+            <label>أو رفع ملف Excel / CSV</label>
+            <div style="display: flex; gap: 10px; margin-bottom: 20px">
+              <input
+                type="file"
+                id="fileInput"
+                accept=".xlsx,.xls,.csv"
+                style="flex: 1"
+              />
+              <button
+                type="button"
+                class="btn btn-secondary"
+                id="uploadFileBtn"
+              >
+                رفع الملف
+              </button>
+              <button
+                type="button"
+                class="btn btn-info"
+                id="downloadTemplateBtn"
+              >
+                ⬇️ نموذج
+              </button>
+            </div>
+          </div>
+
+          <div style="text-align: center; margin: 20px 0; color: #888">أو</div>
+
+          <!-- Manual Entry Section -->
           <div class="form-group">
             <label>عناصر المنيو</label>
             <div id="menuItems">
@@ -85,6 +115,96 @@
         .addEventListener("change", (e) => {
           if (e.target.value) {
             document.getElementById("menuForm").style.display = "block";
+          }
+        });
+
+      // Download CSV template
+      document
+        .getElementById("downloadTemplateBtn")
+        .addEventListener("click", async () => {
+          try {
+            const response = await fetch("/api/menu-template");
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "menu-template.csv";
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+          } catch (err) {
+            alert("خطأ في تحميل النموذج: " + err.message);
+          }
+        });
+
+      // Upload file
+      document
+        .getElementById("uploadFileBtn")
+        .addEventListener("click", async () => {
+          const fileInput = document.getElementById("fileInput");
+          const branchId = document.getElementById("branchSelect").value;
+
+          if (!fileInput.files.length) {
+            alert("اختر ملف أولاً");
+            return;
+          }
+
+          if (!branchId) {
+            alert("اختر فرع أولاً");
+            return;
+          }
+
+          const file = fileInput.files[0];
+          const reader = new FileReader();
+
+          reader.onload = async (e) => {
+            try {
+              const fileContent = e.target.result;
+              let base64Content;
+
+              if (file.name.toLowerCase().endsWith(".csv")) {
+                // For CSV, send as text
+                base64Content = btoa(unescape(encodeURIComponent(fileContent)));
+              } else {
+                // For Excel, use base64
+                base64Content = btoa(
+                  new Uint8Array(fileContent).reduce(
+                    (data, byte) => data + String.fromCharCode(byte),
+                    "",
+                  ),
+                );
+              }
+
+              const response = await fetch(
+                `/api/menu/upload-file?branchId=${branchId}`,
+                {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    file: base64Content,
+                    fileName: file.name,
+                  }),
+                },
+              );
+
+              const data = await response.json();
+
+              if (response.ok) {
+                alert(`تم رفع ${data.count} عنصر بنجاح ✅`);
+                window.location.href = `/activation?restaurantId=${restaurantId}`;
+              } else {
+                alert("خطأ: " + data.error);
+              }
+            } catch (err) {
+              alert("حدث خطأ: " + err.message);
+            }
+          };
+
+          if (file.name.toLowerCase().endsWith(".csv")) {
+            reader.readAsText(file);
+          } else {
+            reader.readAsArrayBuffer(file);
           }
         });
 
