@@ -47,15 +47,23 @@ export async function handleTwilioWebhook(req, res) {
 
     // Process message with AI
     const aiResponse = await processMessage(incomingMessage, session, menu);
+    console.log(`✅ AI response: ${JSON.stringify(aiResponse)}`);
 
     let orderJson = session.order_json || [];
 
     // Handle intents
     if (aiResponse.intent === "place_order" && aiResponse.item) {
+      console.log(`🛒 Intent: place_order, item: ${aiResponse.item}`);
       const item = findMenuItemFuzzy(menu, aiResponse.item);
 
       if (!item) {
         const response = generateTwiML(`${aiResponse.reply} 😅`);
+        console.log(
+          `⚠️ Item not found: "${aiResponse.item}", sending fallback`,
+        );
+        console.log(
+          `📤 Sending fuzzy match failure: ${response.substring(0, 100)}...`,
+        );
         return res.status(200).send(response);
       }
 
@@ -70,8 +78,12 @@ export async function handleTwilioWebhook(req, res) {
     }
 
     if (aiResponse.intent === "confirm_order") {
+      console.log(`✅ Intent: confirm_order`);
       if (orderJson.length === 0) {
         const response = generateTwiML("ما فيش حاجات في الأوردر بتاعك.");
+        console.log(
+          `📤 No items in order, sending: ${response.substring(0, 100)}...`,
+        );
         return res.status(200).send(response);
       }
 
@@ -86,15 +98,25 @@ export async function handleTwilioWebhook(req, res) {
       const confirmMessage = `تم تأكيد الأوردر ✅\nالإجمالي: ${total} جنيه\nشكرًا لاختيارك! 🎉`;
       console.log(`✅ Order confirmed: ${total} EGP`);
       const response = generateTwiML(confirmMessage);
+      console.log(
+        `📤 Sending order confirmation: ${response.substring(0, 100)}...`,
+      );
       return res.status(200).send(response);
     }
 
     // Default reply
+    console.log(`💬 Intent: ${aiResponse.intent} (default reply)`);
     const response = generateTwiML(aiResponse.reply);
+    console.log(
+      `📤 Sending TwiML response for intent "${aiResponse.intent}": ${response.substring(0, 100)}...`,
+    );
+    console.log(`📨 Full response: ${response}`);
     return res.status(200).send(response);
   } catch (err) {
-    console.error("❌ Twilio handler error:", err);
+    console.error("❌ Twilio handler error:", err.message);
+    console.error("   Stack:", err.stack);
     const response = generateTwiML("حصلت مشكلة في المعالجة. حاول مرة أخرى.");
+    console.log(`📤 Sending error response: ${response.substring(0, 100)}...`);
     return res.status(500).send(response);
   }
 }
