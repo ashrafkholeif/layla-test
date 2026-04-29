@@ -80,4 +80,14 @@ app.post("/twilio", async (req, res) => {
   res.send(`<Response><Message>${ai.reply}</Message></Response>`);
 });
 
+app.post("/signup", async (req, res) => {
+  const { name, phone } = req.body;
+
+  const r = await pool.query(
+    "INSERT INTO restaurants (name, phone) VALUES ($1,$2) RETURNING *",
+    [name, phone],
+  );
+
+  res.json(r.rows[0]);
+});
 app.listen(3000, () => console.log("Running..."));
