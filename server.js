@@ -5,7 +5,12 @@ import { processMessage } from "./ai.js";
 import twilio from "twilio";
 
 const { Pool } = pkg;
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false,
+  },
+});
 
 const app = express();
 app.use(bodyParser.urlencoded({ extended: false }));
