@@ -22,6 +22,7 @@ import {
   handleGetRestaurant,
 } from "./routes/activate.js";
 import { handleGetMenuTemplate } from "./routes/template.js";
+import { handleDebugBranches } from "./routes/debug.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -66,6 +67,9 @@ app.get("/api/menu-template", handleGetMenuTemplate);
 // Activation
 app.post("/api/activate", handleActivateRestaurant);
 app.get("/api/restaurant/:restaurantId", handleGetRestaurant);
+
+// Debug endpoint
+app.get("/api/debug/branches", handleDebugBranches);
 
 // ------------------
 // 🤖 TWILIO WEBHOOK (CRITICAL)

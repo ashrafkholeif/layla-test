@@ -19,6 +19,13 @@ export async function handleActivateRestaurant(req, res) {
 
     // Check if restaurant has at least one branch with menu items
     const branches = await db.getBranchesForRestaurant(restaurantId);
+    console.log(
+      `📊 Found ${branches.length} branches for restaurant ${restaurantId}`,
+    );
+    console.log(
+      `   Branches: ${JSON.stringify(branches.map((b) => ({ id: b.id, name: b.name, is_active: b.is_active })))}`,
+    );
+
     if (branches.length === 0) {
       return res.status(400).json({
         error: "Add at least one branch before activating",
@@ -40,9 +47,21 @@ export async function handleActivateRestaurant(req, res) {
       });
     }
 
+    // Activate restaurant
     const activated = await db.activateRestaurant(restaurantId);
+    console.log(`✅ Restaurant activated: ${activated.name}`);
 
-    console.log(`🎉 Restaurant activated: ${restaurant.name}`);
+    // Activate all branches
+    console.log(`🔄 Activating ${branches.length} branches...`);
+    for (const branch of branches) {
+      console.log(`  → Activating branch: ${branch.id} (${branch.name})`);
+      await db.activateBranch(branch.id);
+    }
+    console.log(`✅ All branches activated`);
+
+    console.log(
+      `🎉 Restaurant activated: ${restaurant.name} with ${branches.length} branches`,
+    );
 
     return res.status(200).json({
       success: true,
@@ -50,6 +69,7 @@ export async function handleActivateRestaurant(req, res) {
         id: activated.id,
         name: activated.name,
         is_active: activated.is_active,
+        branchesActivated: branches.length,
       },
       message: "You're live! 🎉",
     });

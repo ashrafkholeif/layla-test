@@ -56,6 +56,20 @@ export async function activateRestaurant(id) {
   }
 }
 
+export async function activateBranch(id) {
+  try {
+    const res = await pool.query(
+      "UPDATE branches SET is_active = true WHERE id = $1 RETURNING *",
+      [id],
+    );
+    console.log(`✅ Branch activated: ${id}`);
+    return res.rows[0];
+  } catch (err) {
+    console.error("❌ Error activating branch:", err.message);
+    throw err;
+  }
+}
+
 // ------------------
 // 🌿 BRANCHES
 // ------------------
