@@ -10,8 +10,12 @@ export async function handleTwilioWebhook(req, res) {
 
   try {
     const incomingMessage = req.body.Body || "";
-    const fromPhone = req.body.From || "";
-    const toPhone = req.body.To || "";
+    let fromPhone = req.body.From || "";
+    let toPhone = req.body.To || "";
+
+    // Strip "whatsapp:" prefix if present (Twilio sends: whatsapp:+1234567890)
+    fromPhone = fromPhone.replace(/^whatsapp:/, "");
+    toPhone = toPhone.replace(/^whatsapp:/, "");
 
     console.log(`📱 From: ${fromPhone}, To: ${toPhone}`);
     console.log(`💬 Message: "${incomingMessage}"`);

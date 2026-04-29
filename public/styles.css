@@ -177,6 +177,28 @@ small {
   background: #dc2626;
 }
 
+.btn-secondary {
+  background: var(--secondary);
+  color: white;
+}
+
+.btn-secondary:hover {
+  background: #d97706;
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+.btn-info {
+  background: #3b82f6;
+  color: white;
+}
+
+.btn-info:hover {
+  background: #2563eb;
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
 .btn-small {
   padding: 8px 16px;
   font-size: 14px;
