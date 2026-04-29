@@ -100,7 +100,7 @@ export async function getBranchById(id) {
 export async function getBranchByPhone(phone) {
   try {
     const res = await pool.query(
-      "SELECT * FROM branches WHERE phone = $1 AND is_active = true",
+      "SELECT * FROM branches WHERE twilio_number = $1 AND is_active = true",
       [phone],
     );
     return res.rows[0] || null;
