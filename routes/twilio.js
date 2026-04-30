@@ -1,5 +1,9 @@
 import { processMessage } from "../ai.js";
-import { findMenuItemFuzzy, resolveAmbiguousItem, normalizeArabic } from "../utils.js";
+import {
+  findMenuItemFuzzy,
+  resolveAmbiguousItem,
+  normalizeArabic,
+} from "../utils.js";
 import * as db from "../db.js";
 import { relayOrderToBranch } from "../twilio-client.js";
 
@@ -29,7 +33,8 @@ export async function handleTwilioWebhook(req, res) {
     // ─────────────────────────────────────────
     // Determine flow: global number vs branch-specific
     // ─────────────────────────────────────────
-    const isGlobalNumber = LAYLA_INBOUND_NUMBER && toPhone === LAYLA_INBOUND_NUMBER;
+    const isGlobalNumber =
+      LAYLA_INBOUND_NUMBER && toPhone === LAYLA_INBOUND_NUMBER;
     let branch = null;
     let session = null;
 
@@ -64,15 +69,25 @@ export async function handleTwilioWebhook(req, res) {
 
       // If we're already awaiting branch selection, process the reply
       if (context.awaitingBranchSelection && context.branchOptions) {
-        const selected = matchBranchSelection(incomingMessage, context.branchOptions);
+        const selected = matchBranchSelection(
+          incomingMessage,
+          context.branchOptions,
+        );
         if (selected) {
           branch = selected;
-          await db.updateSessionBranch(session.id, branch.id);
+          const updatedSession = await db.updateSessionBranch(
+            session.id,
+            branch.id,
+          );
           await db.updateSessionContext(session.id, {});
+          console.log(`✅ Branch selected and saved: ${branch.name}`);
           const welcomeMsg = `تمام! هنطلب من ${branch.name} 🍽️\n\nقوللي عايز إيه؟`;
           return res.status(200).send(generateTwiML(welcomeMsg));
         } else {
-          const retryMsg = buildBranchSelectionMessage(context.branchOptions, true);
+          const retryMsg = buildBranchSelectionMessage(
+            context.branchOptions,
+            true,
+          );
           return res.status(200).send(generateTwiML(retryMsg));
         }
       }
@@ -80,9 +95,9 @@ export async function handleTwilioWebhook(req, res) {
       // First time — ask for branch selection
       const allBranches = await db.getAllActiveBranches();
       if (allBranches.length === 0) {
-        return res.status(200).send(generateTwiML(
-          "مفيش فروع متاحة حاليًا. حاول تاني بعدين."
-        ));
+        return res
+          .status(200)
+          .send(generateTwiML("مفيش فروع متاحة حاليًا. حاول تاني بعدين."));
       }
 
       const newContext = {
@@ -117,12 +132,21 @@ export async function handleTwilioWebhook(req, res) {
     if (context.awaitingItemSelection && context.itemOptions) {
       const selected = matchItemSelection(incomingMessage, context.itemOptions);
       if (selected) {
-        await db.setPendingItem(session.id, selected.name, selected.price, context.selectionQty || 1);
+        await db.setPendingItem(
+          session.id,
+          selected.name,
+          selected.price,
+          context.selectionQty || 1,
+        );
         await db.updateSessionContext(session.id, {});
         const confirmMsg = `تمام! عايز ${selected.name} (${selected.price} جنيه)؟ (قول "نعم" للتأكيد أو "لا" للرفض)`;
         return res.status(200).send(generateTwiML(confirmMsg));
       } else {
-        const retryMsg = buildItemSelectionMessage(context.itemOptions, context.selectionQuery, true);
+        const retryMsg = buildItemSelectionMessage(
+          context.itemOptions,
+          context.selectionQuery,
+          true,
+        );
         return res.status(200).send(generateTwiML(retryMsg));
       }
     }
@@ -194,7 +218,10 @@ export async function handleTwilioWebhook(req, res) {
           selectionQty: qty,
         };
         await db.updateSessionContext(session.id, context);
-        const selectionMsg = buildItemSelectionMessage(resolution.items, aiResponse.item);
+        const selectionMsg = buildItemSelectionMessage(
+          resolution.items,
+          aiResponse.item,
+        );
         return res.status(200).send(generateTwiML(selectionMsg));
       }
 
@@ -232,7 +259,12 @@ export async function handleTwilioWebhook(req, res) {
 
       // Relay order to restaurant branch via WhatsApp
       if (branch.phone) {
-        const relayResult = await relayOrderToBranch(branch.phone, fromPhone, orderJson, total);
+        const relayResult = await relayOrderToBranch(
+          branch.phone,
+          fromPhone,
+          orderJson,
+          total,
+        );
         if (!relayResult.success) {
           console.error(`❌ Order relay failed: ${relayResult.error}`);
         }
@@ -302,7 +334,7 @@ function matchBranchSelection(message, options) {
     const displayName = normalizeArabic(
       branch.restaurant_name
         ? `${branch.restaurant_name} ${branch.name}`
-        : branch.name
+        : branch.name,
     );
     if (displayName.includes(normalized) || normalized.includes(displayName)) {
       return branch;

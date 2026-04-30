@@ -131,7 +131,7 @@ export async function getAllActiveBranches() {
        FROM branches b
        JOIN restaurants r ON b.restaurant_id = r.id
        WHERE b.is_active = true AND r.is_active = true
-       ORDER BY r.name, b.name`
+       ORDER BY r.name, b.name`,
     );
     return res.rows;
   } catch (err) {
@@ -150,7 +150,7 @@ export async function searchBranchesByName(searchTerm) {
        AND (LOWER(b.name) LIKE LOWER($1) OR LOWER(r.name) LIKE LOWER($1))
        ORDER BY r.name, b.name
        LIMIT 10`,
-      [`%${searchTerm}%`]
+      [`%${searchTerm}%`],
     );
     return res.rows;
   } catch (err) {
@@ -240,7 +240,9 @@ export async function getOrCreateSession(branchId, userPhone) {
       [branchId, userPhone, JSON.stringify([])],
     );
 
-    console.log(`✅ New session created for ${userPhone} (branch: ${branchId})`);
+    console.log(
+      `✅ New session created for ${userPhone} (branch: ${branchId})`,
+    );
     return res.rows[0];
   } catch (err) {
     console.error("❌ Error managing session:", err.message);
@@ -250,16 +252,19 @@ export async function getOrCreateSession(branchId, userPhone) {
 
 export async function getOrCreateGlobalSession(userPhone) {
   try {
-    // Look for existing global session (branch_id IS NULL)
+    // Look for ANY existing session for this user (global or branch-specific)
+    // Priority: look for global session first (branch_id IS NULL)
     let res = await pool.query(
-      "SELECT * FROM sessions WHERE user_phone = $1 AND branch_id IS NULL",
+      "SELECT * FROM sessions WHERE user_phone = $1 ORDER BY branch_id NULLS FIRST LIMIT 1",
       [userPhone],
     );
 
     if (res.rows.length > 0) {
+      console.log(`✅ Existing session found for ${userPhone}`);
       return res.rows[0];
     }
 
+    // No existing session, create new global one
     res = await pool.query(
       "INSERT INTO sessions (user_phone, order_json, context) VALUES ($1, $2, $3) RETURNING *",
       [userPhone, JSON.stringify([]), JSON.stringify({})],
