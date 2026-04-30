@@ -189,6 +189,43 @@ export async function handleTwilioWebhook(req, res) {
     }
 
     // ─────────────────────────────────────────
+    // 3b. Check if user is finalizing the order (no pending item, but has items in order)
+    // ─────────────────────────────────────────
+    if (
+      !pendingItem &&
+      orderJson.length > 0 &&
+      (incomingMessage.toLowerCase().includes("تمام") ||
+        incomingMessage.toLowerCase().includes("خلص") ||
+        incomingMessage.toLowerCase().includes("انتهي"))
+    ) {
+      console.log(`✅ User finalizing order with ${orderJson.length} items`);
+
+      let total = 0;
+      let orderDetails = "الطلب:\n";
+      for (const order of orderJson) {
+        const itemTotal = order.price * order.qty;
+        total += itemTotal;
+        orderDetails += `• ${order.item} x${order.qty} = ${itemTotal} جنيه\n`;
+      }
+
+      await db.createOrder(branch.id, fromPhone, orderJson, total);
+      await db.clearSession(session.id);
+
+      // Send order to restaurant branch's WhatsApp number
+      if (branch.phone) {
+        const restaurantMsg = `📦 طلب جديد من ${fromPhone}\n\n${orderDetails}\nالإجمالي: ${total} جنيه`;
+        console.log(`📨 Relaying order to restaurant: ${branch.phone}`);
+        console.log(`   Message: ${restaurantMsg}`);
+        // TODO: Implement actual Twilio message sending to branch.phone
+      }
+
+      const confirmMessage = `تم تأكيد الأوردر ✅\n${orderDetails}الإجمالي: ${total} جنيه\nشكرًا لاختيارك! 🎉`;
+      console.log(`✅ Order confirmed: ${total} EGP`);
+      const response = generateTwiML(confirmMessage);
+      return res.status(200).send(response);
+    }
+
+    // ─────────────────────────────────────────
     // 4. Process message with AI
     // ─────────────────────────────────────────
     const aiResponse = await processMessage(incomingMessage, session, menu);
