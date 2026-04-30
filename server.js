@@ -23,6 +23,7 @@ import {
 } from "./routes/activate.js";
 import { handleGetMenuTemplate } from "./routes/template.js";
 import { handleDebugBranches } from "./routes/debug.js";
+import { handleTestChat } from "./routes/test-chat.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -70,6 +71,9 @@ app.get("/api/restaurant/:restaurantId", handleGetRestaurant);
 
 // Debug endpoint
 app.get("/api/debug/branches", handleDebugBranches);
+
+// Test chat endpoint (for testing without Twilio limits)
+app.post("/api/test-chat", handleTestChat);
 
 // ------------------
 // 🤖 TWILIO WEBHOOK (CRITICAL)
@@ -122,7 +126,9 @@ app.use((req, res) => {
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-  const mode = process.env.LAYLA_INBOUND_NUMBER ? "🌍 GLOBAL NUMBER" : "📞 BRANCH-SPECIFIC";
+  const mode = process.env.LAYLA_INBOUND_NUMBER
+    ? "🌍 GLOBAL NUMBER"
+    : "📞 BRANCH-SPECIFIC";
   console.log(`
 ╔════════════════════════════════════════╗
 ║  🍽️  Layla Backend v2.0 🍽️             ║

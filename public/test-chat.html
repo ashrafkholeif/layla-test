@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="en" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Layla - Test Chat</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <style>
+      .chat-container {
+        max-width: 600px;
+        margin: 0 auto;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+      }
+
+      .chat-header {
+        margin-bottom: 20px;
+        text-align: center;
+      }
+
+      .chat-header h1 {
+        margin: 0;
+        font-size: 24px;
+      }
+
+      .chat-header p {
+        margin: 5px 0 0 0;
+        color: #6b7280;
+        font-size: 14px;
+      }
+
+      .branch-selector {
+        margin-bottom: 20px;
+        display: flex;
+        gap: 10px;
+      }
+
+      .branch-selector select {
+        flex: 1;
+        padding: 10px;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        font-size: 14px;
+      }
+
+      .branch-selector button {
+        padding: 10px 20px;
+        background: #3b82f6;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 500;
+      }
+
+      .branch-selector button:hover {
+        background: #2563eb;
+      }
+
+      .messages {
+        flex: 1;
+        overflow-y: auto;
+        margin-bottom: 20px;
+        padding: 20px;
+        background: #f9fafb;
+        border-radius: 8px;
+        border: 1px solid #e5e7eb;
+      }
+
+      .message {
+        margin-bottom: 15px;
+        display: flex;
+        animation: slideIn 0.3s ease-in-out;
+      }
+
+      @keyframes slideIn {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .message.bot {
+        justify-content: flex-start;
+      }
+
+      .message.user {
+        justify-content: flex-end;
+      }
+
+      .message-content {
+        max-width: 70%;
+        padding: 10px 15px;
+        border-radius: 8px;
+        word-wrap: break-word;
+      }
+
+      .message.bot .message-content {
+        background: #e5e7eb;
+        color: #111827;
+      }
+
+      .message.user .message-content {
+        background: #10b981;
+        color: white;
+      }
+
+      .input-group {
+        display: flex;
+        gap: 10px;
+      }
+
+      .input-group input {
+        flex: 1;
+        padding: 12px;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        font-size: 14px;
+      }
+
+      .input-group button {
+        padding: 12px 20px;
+        background: #10b981;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 500;
+      }
+
+      .input-group button:hover {
+        background: #059669;
+      }
+
+      .order-summary {
+        background: #f0fdf4;
+        border: 1px solid #86efac;
+        border-radius: 8px;
+        padding: 15px;
+        margin-top: 10px;
+        font-size: 14px;
+      }
+
+      .order-summary h4 {
+        margin: 0 0 10px 0;
+        color: #166534;
+      }
+
+      .order-item {
+        color: #16a34a;
+        margin: 5px 0;
+      }
+
+      .disabled {
+        opacity: 0.5;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="chat-container">
+      <div class="chat-header">
+        <h1>🧪 اختبر Layla</h1>
+        <p>Test Chat - بدون حدود Twilio</p>
+      </div>
+
+      <div class="branch-selector">
+        <select id="branchSelect">
+          <option value="">-- اختر فرع للاختبار --</option>
+        </select>
+        <button onclick="startNewSession()">جديد</button>
+      </div>
+
+      <div class="messages" id="messages"></div>
+
+      <div class="input-group">
+        <input
+          type="text"
+          id="messageInput"
+          placeholder="اكتب رسالتك هنا..."
+          onkeypress="if (event.key === 'Enter') sendMessage();"
+        />
+        <button onclick="sendMessage()">إرسال</button>
+      </div>
+    </div>
+
+    <script>
+      let selectedBranchId = null;
+      let userPhone = "+201234567890";
+      let orderJson = [];
+
+      async function loadBranches() {
+        try {
+          const response = await fetch("/api/branches/1"); // Assuming restaurant ID 1 for testing
+          const data = await response.json();
+          if (data.branches && data.branches.length > 0) {
+            const select = document.getElementById("branchSelect");
+            select.innerHTML = '<option value="">-- اختر فرع --</option>';
+            data.branches.forEach((branch) => {
+              const option = document.createElement("option");
+              option.value = branch.id;
+              option.textContent = branch.name;
+              select.appendChild(option);
+            });
+          }
+        } catch (err) {
+          console.error("Error loading branches:", err);
+          addMessage("خطأ في تحميل الفروع", "bot");
+        }
+      }
+
+      function startNewSession() {
+        const select = document.getElementById("branchSelect");
+        if (!select.value) {
+          alert("اختر فرع أولاً");
+          return;
+        }
+        selectedBranchId = select.value;
+        orderJson = [];
+        document.getElementById("messages").innerHTML = "";
+        addMessage("تمام! ابدأ بقول عايز إيه 🍽️", "bot");
+      }
+
+      async function sendMessage() {
+        const input = document.getElementById("messageInput");
+        const message = input.value.trim();
+
+        if (!message) {
+          return;
+        }
+
+        if (!selectedBranchId) {
+          alert("اختر فرع أولاً");
+          return;
+        }
+
+        // Add user message to chat
+        addMessage(message, "user");
+        input.value = "";
+
+        try {
+          const response = await fetch("/api/test-chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              message,
+              branchId: parseInt(selectedBranchId),
+              userPhone,
+            }),
+          });
+
+          const data = await response.json();
+
+          if (response.ok) {
+            // Add bot reply
+            addMessage(data.reply, "bot");
+
+            // Update order summary
+            if (data.orderJson && data.orderJson.length > 0) {
+              orderJson = data.orderJson;
+              showOrderSummary(data.orderJson);
+            } else if (data.orderConfirmed) {
+              orderJson = [];
+              addMessage(
+                `✅ الطلب تم حفظه بنجاح! المبلغ الإجمالي: ${data.total} جنيه`,
+                "bot",
+              );
+            }
+          } else {
+            addMessage("خطأ: " + (data.error || "حدث خطأ ما"), "bot");
+          }
+        } catch (err) {
+          addMessage("خطأ في الاتصال: " + err.message, "bot");
+          console.error(err);
+        }
+      }
+
+      function addMessage(text, sender) {
+        const messagesDiv = document.getElementById("messages");
+        const messageDiv = document.createElement("div");
+        messageDiv.className = `message ${sender}`;
+
+        const contentDiv = document.createElement("div");
+        contentDiv.className = "message-content";
+        contentDiv.textContent = text;
+
+        messageDiv.appendChild(contentDiv);
+        messagesDiv.appendChild(messageDiv);
+
+        // Scroll to bottom
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      }
+
+      function showOrderSummary(items) {
+        const messagesDiv = document.getElementById("messages");
+        const summaryDiv = document.createElement("div");
+        summaryDiv.className = "order-summary";
+
+        let total = 0;
+        let html = "<h4>📋 الطلب الحالي:</h4>";
+
+        items.forEach((item) => {
+          const itemTotal = item.price * item.qty;
+          total += itemTotal;
+          html += `<div class="order-item">• ${item.item} x${item.qty} = ${itemTotal} جنيه</div>`;
+        });
+
+        html += `<div class="order-item"><strong>الإجمالي: ${total} جنيه</strong></div>`;
+        summaryDiv.innerHTML = html;
+
+        // Remove old summary if exists
+        const oldSummary = messagesDiv.querySelector(".order-summary");
+        if (oldSummary) oldSummary.remove();
+
+        messagesDiv.appendChild(summaryDiv);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      }
+
+      // Load branches on page load
+      loadBranches();
+    </script>
+  </body>
+</html>
